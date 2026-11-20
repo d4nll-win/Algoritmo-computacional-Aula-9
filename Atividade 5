@@ -1,0 +1,139 @@
+#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct
+{
+    char titulo[12];
+    int zona;
+} Eleitor;
+
+typedef struct
+{
+    Eleitor eleitor;    // struct aninhada
+    int numero_voto;
+} Cedula;
+
+// a) Adiciona um voto, aumentando a memoria com realloc a cada novo voto
+int adicionarVoto(Cedula **lista, int *qtd, Cedula nova)
+{
+    Cedula *temp = (Cedula *) realloc(*lista, (*qtd + 1) * sizeof(Cedula));
+
+    if (temp == NULL)
+        return 0;   // a lista antiga continua valida
+
+    *lista = temp;
+    (*lista)[*qtd] = nova;
+    (*qtd)++;
+    return 1;
+}
+
+// b) Salva a lista completa no arquivo binario
+int salvarUrnas(const char *arquivo, Cedula *lista, int qtd)
+{
+    FILE *arq = fopen(arquivo, "wb");
+    int escritos;
+
+    if (arq == NULL)
+        return 0;
+    escritos = (int) fwrite(lista, sizeof(Cedula), qtd, arq);
+    fclose(arq);
+    return escritos == qtd;
+}
+
+// c) Recuperacao rapida: descobre o tamanho com fseek/ftell, aloca de uma vez e le tudo
+Cedula *recuperarUrnas(const char *arquivo, int *qtd)
+{
+    FILE *arq;
+    Cedula *lista;
+    long tamanho;
+
+    *qtd = 0;
+    arq = fopen(arquivo, "rb");
+    if (arq == NULL)
+        return NULL;
+
+    fseek(arq, 0, SEEK_END);
+    tamanho = ftell(arq);
+    fseek(arq, 0, SEEK_SET);
+
+    *qtd = (int) (tamanho / sizeof(Cedula));
+    if (*qtd == 0)
+    {
+        fclose(arq);
+        return NULL;
+    }
+
+    lista = (Cedula *) malloc(tamanho);   // espaco exato, em uma unica alocacao
+    if (lista == NULL)
+    {
+        fclose(arq);
+        *qtd = 0;
+        return NULL;
+    }
+
+    fread(lista, sizeof(Cedula), *qtd, arq);   // todos os registros de uma vez
+    fclose(arq);
+
+    return lista;
+}
+
+int main()
+{
+    Cedula *urna = NULL;
+    Cedula *recuperada;
+    Cedula nova;
+    int qtd = 0, qtdRec, continuar, i;
+
+    do
+    {
+        printf("--- Voto %d ---\n", qtd + 1);
+        printf("Titulo do eleitor (ate 11 caracteres): ");
+        scanf(" %11s", nova.eleitor.titulo);
+        printf("Zona: ");
+        scanf("%d", &nova.eleitor.zona);
+        printf("Numero do voto: ");
+        scanf("%d", &nova.numero_voto);
+
+        if (!adicionarVoto(&urna, &qtd, nova))
+        {
+            printf("Erro de memoria ao adicionar o voto!\n");
+            break;
+        }
+
+        printf("Registrar outro voto? (1 - sim, 0 - nao): ");
+        scanf("%d", &continuar);
+    } while (continuar == 1);
+
+    if (qtd == 0)
+    {
+        printf("Nenhum voto registrado.\n");
+        free(urna);
+        return 0;
+    }
+
+    if (!salvarUrnas("urnas.bin", urna, qtd))
+    {
+        printf("Erro ao salvar urnas.bin!\n");
+        free(urna);
+        return 1;
+    }
+    printf("\n%d voto(s) salvo(s) em urnas.bin (%d bytes)\n", qtd, (int) (qtd * sizeof(Cedula)));
+    free(urna);   // libera a memoria original; a recuperacao le tudo do arquivo
+
+    recuperada = recuperarUrnas("urnas.bin", &qtdRec);
+    if (recuperada == NULL)
+    {
+        printf("Erro ao recuperar urnas.bin!\n");
+        return 1;
+    }
+
+    printf("\n=== Votos recuperados do arquivo ===\n");
+    printf("%-14s %-6s %s\n", "Titulo", "Zona", "Voto");
+    for (i = 0; i < qtdRec; i++)
+        printf("%-14s %-6d %d\n", recuperada[i].eleitor.titulo, recuperada[i].eleitor.zona,
+               recuperada[i].numero_voto);
+
+    free(recuperada);
+
+    return 0;
+}
