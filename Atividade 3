@@ -1,0 +1,102 @@
+#include <stdio.h>
+
+typedef struct
+{
+    int conta_corrente;
+    char nome[50];
+    float saldo;
+} Cliente;
+
+// Cria um clientes.bin de exemplo caso o arquivo ainda nao exista
+int criarArquivoExemplo()
+{
+    Cliente exemplo[3] = {
+        {1001, "Ana Souza", 1500.00},
+        {1002, "Bruno Lima", 320.50},
+        {1003, "Carla Dias", 0.00}
+    };
+    FILE *arq = fopen("clientes.bin", "wb");
+
+    if (arq == NULL)
+        return 0;
+    fwrite(exemplo, sizeof(Cliente), 3, arq);
+    fclose(arq);
+    return 1;
+}
+
+int main()
+{
+    FILE *arq;
+    Cliente c;
+    int conta, operacao, encontrou = 0;
+    float valor, saldoAnterior;
+
+    // a) Conta e valor
+    printf("Numero da conta corrente: ");
+    scanf("%d", &conta);
+    printf("Operacao (1 - Deposito, 2 - Saque): ");
+    scanf("%d", &operacao);
+    printf("Valor: R$ ");
+    scanf("%f", &valor);
+
+    if ((operacao != 1 && operacao != 2) || valor <= 0)
+    {
+        printf("Operacao ou valor invalido!\n");
+        return 1;
+    }
+
+    // b) Abre em modo leitura/escrita ("rb+")
+    arq = fopen("clientes.bin", "rb+");
+    if (arq == NULL)
+    {
+        printf("clientes.bin nao encontrado. Criando um arquivo de exemplo...\n");
+        if (!criarArquivoExemplo())
+        {
+            printf("Erro ao criar o arquivo!\n");
+            return 1;
+        }
+        arq = fopen("clientes.bin", "rb+");
+        if (arq == NULL)
+        {
+            printf("Erro ao abrir o arquivo!\n");
+            return 1;
+        }
+    }
+
+    // c) Le registro por registro ate achar a conta
+    while (fread(&c, sizeof(Cliente), 1, arq) == 1)
+    {
+        if (c.conta_corrente == conta)
+        {
+            encontrou = 1;
+            saldoAnterior = c.saldo;
+
+            if (operacao == 2 && valor > c.saldo)
+            {
+                printf("\nSaldo insuficiente! Saldo atual: R$ %.2f\n", c.saldo);
+                break;
+            }
+
+            if (operacao == 1)
+                c.saldo += valor;
+            else
+                c.saldo -= valor;
+
+            // d) fseek volta exatamente um registro e sobrescreve o antigo com o atualizado
+            fseek(arq, -(long) sizeof(Cliente), SEEK_CUR);
+            fwrite(&c, sizeof(Cliente), 1, arq);
+
+            printf("\nCliente: %s (conta %d)\n", c.nome, c.conta_corrente);
+            printf("Saldo anterior: R$ %.2f\n", saldoAnterior);
+            printf("Saldo atual:    R$ %.2f\n", c.saldo);
+            break;
+        }
+    }
+
+    if (!encontrou)
+        printf("\nConta %d nao encontrada!\n", conta);
+
+    fclose(arq);
+
+    return 0;
+}
