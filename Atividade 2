@@ -1,0 +1,69 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct
+{
+    int id;
+    char cargo[30];
+    float salario;
+} Funcionario;
+
+int main()
+{
+    Funcionario *original, *backup;
+    Funcionario lido;
+    FILE *arq;
+
+    // a) Aloca dinamicamente o registro do funcionario e preenche os dados
+    original = (Funcionario *) malloc(sizeof(Funcionario));
+    // b) Aloca o segundo registro (Buffer de Backup)
+    backup = (Funcionario *) malloc(sizeof(Funcionario));
+    if (original == NULL || backup == NULL)
+    {
+        printf("Erro de memoria!\n");
+        free(original);
+        free(backup);
+        return 1;
+    }
+
+    printf("ID do funcionario: ");
+    scanf("%d", &original->id);
+    printf("Cargo: ");
+    scanf(" %29[^\n]", original->cargo);
+    printf("Salario: R$ ");
+    scanf("%f", &original->salario);
+
+    // c) memcpy espelha os dados do original no buffer de backup
+    memcpy(backup, original, sizeof(Funcionario));
+
+    // d) Salva o buffer de backup no arquivo binario backup_rh.bin
+    arq = fopen("backup_rh.bin", "wb");
+    if (arq == NULL)
+    {
+        printf("Erro ao criar o arquivo backup_rh.bin!\n");
+        free(original);
+        free(backup);
+        return 1;
+    }
+    fwrite(backup, sizeof(Funcionario), 1, arq);
+    fclose(arq);
+    printf("\nBackup salvo em backup_rh.bin (%d bytes)\n", (int) sizeof(Funcionario));
+
+    // Conferencia: le o arquivo de volta e mostra o conteudo
+    arq = fopen("backup_rh.bin", "rb");
+    if (arq != NULL)
+    {
+        if (fread(&lido, sizeof(Funcionario), 1, arq) == 1)
+        {
+            printf("\n--- Conteudo gravado no backup ---\n");
+            printf("ID: %d\nCargo: %s\nSalario: R$ %.2f\n", lido.id, lido.cargo, lido.salario);
+        }
+        fclose(arq);
+    }
+
+    free(original);
+    free(backup);
+
+    return 0;
+}
